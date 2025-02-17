@@ -11,6 +11,8 @@
 #include <ACAN2515_Buffer16.h>
 #include <ACAN2515Settings.h>
 #include <MCP2515ReceiveFilters.h>
+#include <driver/gpio.h>
+#include <driver/spi_master.h>
 #include <esp_timer.h>
 
 //----------------------------------------------------------------------------------------
