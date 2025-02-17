@@ -73,12 +73,10 @@ static const uint8_t RXFSIDH_REGISTER[6] = {0x00, 0x04, 0x08, 0x10, 0x14, 0x18};
 [[noreturn]] static void myESP32Task(void* pData) {
     auto* canDriver = static_cast<ACAN2515*>(pData);
     while (true) {
-        while (canDriver->paused()) {vTaskDelay(1 / portTICK_PERIOD_MS);}
         canDriver->attachMCP2515InterruptPin();
         xSemaphoreTake(canDriver->mISRSemaphore, portMAX_DELAY);
         bool loop = true;
         while (loop) {
-            while (canDriver->paused()) {vTaskDelay(1 / portTICK_PERIOD_MS);}
             loop = canDriver->isr_core();
         }
     }
@@ -222,9 +220,7 @@ uint16_t ACAN2515::beginWithoutFilterCheck(const ACAN2515Settings& inSettings,
             // 255 means interrupt is not used
             mInterruptServiceRoutine = inInterruptServiceRoutine;
         }
-        if (!driverInitialised) {
-            xTaskCreate(myESP32Task, "ACAN2515Handler", 2048, this, 16, NULL);
-        }
+        xTaskCreate(myESP32Task, "ACAN2515Handler", 2048, this, 16, &mTaskHandle);
         driverInitialised = true;
     }
     //----------------------------------- Return
@@ -570,6 +566,8 @@ void ACAN2515::end() {
     if (mINT != 255) {
         gpio_isr_handler_remove(mINT);
     }
+    //--- Delete ESP task
+    vTaskDelete(mTaskHandle);
     //--- Request configuration mode
     constexpr uint8_t configurationMode = (0b100 << 5);
     const uint16_t errorCode __attribute__((unused)) = setRequestedMode(configurationMode);
@@ -583,9 +581,7 @@ void ACAN2515::end() {
 uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
                          gpio_isr_t inInterruptServiceRoutine) {
     end();
-    driverPaused = true;
     const auto ret = beginWithoutFilterCheck(inSettings, inInterruptServiceRoutine, ACAN2515Mask(), ACAN2515Mask(), NULL, 0);
-    driverPaused = false;
     return ret;
 }
 
@@ -600,11 +596,9 @@ uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
     } else if (inAcceptanceFilters == nullptr) {
         errorCode = kAcceptanceFilterArrayIsNULL;
     } else {
-        driverPaused = true;
         end();
         errorCode = beginWithoutFilterCheck(inSettings, inInterruptServiceRoutine,
                                             inRXM0, inRXM0, inAcceptanceFilters, inAcceptanceFilterCount);
-        driverPaused = false;
     }
     return errorCode;
 }
@@ -623,11 +617,9 @@ uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
     } else if (inAcceptanceFilters == nullptr) {
         errorCode = kAcceptanceFilterArrayIsNULL;
     } else {
-        driverPaused = true;
         end();
         errorCode = beginWithoutFilterCheck(inSettings, inInterruptServiceRoutine,
                                             inRXM0, inRXM1, inAcceptanceFilters, inAcceptanceFilterCount);
-        driverPaused = false;
     }
     return errorCode;
 }

@@ -7,7 +7,8 @@
 #pragma once
 
 //----------------------------------------------------------------------------------------
-
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <ACAN2515_Buffer16.h>
 #include <ACAN2515Settings.h>
 #include <MCP2515ReceiveFilters.h>
@@ -145,11 +146,11 @@ private:
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     spi_device_handle_t mDevice;
+    TaskHandle_t mTaskHandle;
     // const SPISettings mSPISettings;
     gpio_num_t mINT;
     bool mRolloverEnable;
     bool driverInitialised = false;
-    bool driverPaused = false;
 
 public:
     SemaphoreHandle_t mISRSemaphore;
@@ -244,7 +245,6 @@ private:
 
 public:
     void poll() const;
-    bool paused() const { return driverPaused; }
 
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
