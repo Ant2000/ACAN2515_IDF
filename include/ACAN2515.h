@@ -106,7 +106,7 @@ public:
                          const ACAN2515AcceptanceFilter inAcceptanceFilters[],
                          uint8_t inAcceptanceFilterCount);
 
-    uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
+    uint16_t resetDriver(const ACAN2515Settings& inSettings,
                          gpio_isr_t inInterruptServiceRoutine,
                          ACAN2515Mask inRXM0,
                          ACAN2515Mask inRXM1,
