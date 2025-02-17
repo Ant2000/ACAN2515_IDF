@@ -222,7 +222,9 @@ uint16_t ACAN2515::beginWithoutFilterCheck(const ACAN2515Settings& inSettings,
             // 255 means interrupt is not used
             mInterruptServiceRoutine = inInterruptServiceRoutine;
         }
-        xTaskCreate(myESP32Task, "ACAN2515Handler", 1024, this, 16, NULL);
+        if (!driverInitialised) {
+            xTaskCreate(myESP32Task, "ACAN2515Handler", 2048, this, 16, NULL);
+        }
         driverInitialised = true;
     }
     //----------------------------------- Return
