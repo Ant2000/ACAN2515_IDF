@@ -95,6 +95,21 @@ public:
 
     void end();
 
+    uint16_t resetDriver(const ACAN2515Settings& inSettings,
+                         gpio_isr_t inInterruptServiceRoutine);
+
+    uint16_t resetDriver(const ACAN2515Settings& inSettings,
+                         gpio_isr_t inInterruptServiceRoutine,
+                         ACAN2515Mask inRXM0,
+                         const ACAN2515AcceptanceFilter inAcceptanceFilters[],
+                         uint8_t inAcceptanceFilterCount);
+
+    uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
+                         gpio_isr_t inInterruptServiceRoutine,
+                         ACAN2515Mask inRXM0,
+                         ACAN2515Mask inRXM1,
+                         const ACAN2515AcceptanceFilter inAcceptanceFilters[],
+                         uint8_t inAcceptanceFilterCount);
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     //    Receiving messages
@@ -131,6 +146,8 @@ private:
     // const SPISettings mSPISettings;
     gpio_num_t mINT;
     bool mRolloverEnable;
+    bool driverInitialised = false;
+    bool driverPaused = false;
 
 public:
     SemaphoreHandle_t mISRSemaphore;
@@ -225,6 +242,7 @@ private:
 
 public:
     void poll() const;
+    bool paused() const { return driverPaused; }
 
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

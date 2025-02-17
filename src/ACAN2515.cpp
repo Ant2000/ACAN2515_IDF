@@ -73,10 +73,12 @@ static const uint8_t RXFSIDH_REGISTER[6] = {0x00, 0x04, 0x08, 0x10, 0x14, 0x18};
 [[noreturn]] static void myESP32Task(void* pData) {
     auto* canDriver = static_cast<ACAN2515*>(pData);
     while (true) {
+        while (canDriver->paused()) {vTaskDelay(1 / portTICK_PERIOD_MS);}
         canDriver->attachMCP2515InterruptPin();
         xSemaphoreTake(canDriver->mISRSemaphore, portMAX_DELAY);
         bool loop = true;
         while (loop) {
+            while (canDriver->paused()) {vTaskDelay(1 / portTICK_PERIOD_MS);}
             loop = canDriver->isr_core();
         }
     }
@@ -184,7 +186,7 @@ uint16_t ACAN2515::beginWithoutFilterCheck(const ACAN2515Settings& inSettings,
     //----------------------------------- if no error, configure port and MCP2515
     if (errorCode == 0) {
         //--- Configure ports
-        if (mINT != 255) {
+        if (mINT != 255 && !driverInitialised) {
             // 255 means interrupt is not used
             gpio_config_t io_conf{
                 .pin_bit_mask = (1ULL << mINT),
@@ -221,6 +223,7 @@ uint16_t ACAN2515::beginWithoutFilterCheck(const ACAN2515Settings& inSettings,
             mInterruptServiceRoutine = inInterruptServiceRoutine;
         }
         xTaskCreate(myESP32Task, "ACAN2515Handler", 1024, this, 16, NULL);
+        driverInitialised = true;
     }
     //----------------------------------- Return
     return errorCode;
@@ -575,6 +578,57 @@ void ACAN2515::end() {
     mReceiveBuffer.free();
 }
 
+uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
+                         gpio_isr_t inInterruptServiceRoutine) {
+    end();
+    driverPaused = true;
+    const auto ret = beginWithoutFilterCheck(inSettings, inInterruptServiceRoutine, ACAN2515Mask(), ACAN2515Mask(), NULL, 0);
+    driverPaused = false;
+    return ret;
+}
+
+uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
+                         gpio_isr_t inInterruptServiceRoutine,
+                         const ACAN2515Mask inRXM0,
+                         const ACAN2515AcceptanceFilter inAcceptanceFilters[],
+                         const uint8_t inAcceptanceFilterCount) {
+    uint16_t errorCode = 0;
+    if (inAcceptanceFilterCount == 0 || inAcceptanceFilterCount > 2) {
+        errorCode = kOneFilterMaskRequiresOneOrTwoAcceptanceFilters;
+    } else if (inAcceptanceFilters == nullptr) {
+        errorCode = kAcceptanceFilterArrayIsNULL;
+    } else {
+        driverPaused = true;
+        end();
+        errorCode = beginWithoutFilterCheck(inSettings, inInterruptServiceRoutine,
+                                            inRXM0, inRXM0, inAcceptanceFilters, inAcceptanceFilterCount);
+        driverPaused = false;
+    }
+    return errorCode;
+}
+
+uint16_t ACAN2515::resetDriver(const ACAN2515Settings& inSettings,
+                         gpio_isr_t inInterruptServiceRoutine,
+                         const ACAN2515Mask inRXM0,
+                         const ACAN2515Mask inRXM1,
+                         const ACAN2515AcceptanceFilter inAcceptanceFilters[],
+                         const uint8_t inAcceptanceFilterCount) {
+    uint16_t errorCode = 0;
+    if (inAcceptanceFilterCount < 3) {
+        errorCode = kTwoFilterMasksRequireThreeToSixAcceptanceFilters;
+    } else if (inAcceptanceFilterCount > 6) {
+        errorCode = kTwoFilterMasksRequireThreeToSixAcceptanceFilters;
+    } else if (inAcceptanceFilters == nullptr) {
+        errorCode = kAcceptanceFilterArrayIsNULL;
+    } else {
+        driverPaused = true;
+        end();
+        errorCode = beginWithoutFilterCheck(inSettings, inInterruptServiceRoutine,
+                                            inRXM0, inRXM1, inAcceptanceFilters, inAcceptanceFilterCount);
+        driverPaused = false;
+    }
+    return errorCode;
+}
 
 //------------------------------------------------------------------------------
 //    POLLING (ESP32)
